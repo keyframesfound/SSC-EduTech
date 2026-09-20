@@ -14,4 +14,6 @@ I am an ICT teacher of a secondary school, in charge of teaching senior form ICT
 ```
 
 ## OpenManusBot
-The OpenManusBot is an alternative to grokbot. Currently it is used in automating tasks and creating AI councils. I am testing the use of This alternative with KimiK3 and also OpenCode, which has a free model version. I also have tested with OpenAI compatible ones, however it is unable to do fully automated tasks. As for local models, 8B and 14B are out of the picture as 8B and 14B both are unable to use connector MCPs. As per suggestion, I advise the use of smart models like Kimik3 or Grok or Open Code Free Models as the main chief of staff while using local models like Quen 120B to be the secrets model.
+The OpenManusBot is an alternative to grokbot. Currently it is used in automating tasks and creating AI councils. I am testing the use of This alternative with KimiK3 and also OpenCode, which has a free model version. I also have tested with OpenAI compatible ones, however it is unable to do fully automated tasks. 
+<img width="944" height="708" alt="Screenshot 2026-09-20 at 16 30 04" src="https://github.com/user-attachments/assets/85bb625d-b6b8-4175-9f02-a344389a2dee" />
+As for local models, 8B and 14B are out of the picture as 8B and 14B both are unable to use connector MCPs. As per suggestion, I advise the use of smart models like Kimik3 or Grok or Open Code Free Models as the main chief of staff while using local models like Quen 120B to be the secrets model.
