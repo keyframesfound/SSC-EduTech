@@ -87,6 +87,19 @@ User: "What do I have tomorrow? Put a 15-min break at noon."
 
 ```
 
+In addition the change of the agent timeout minute. 
+By changing from 5 to now 20 min it allows the Agent to work on larger and more complex tasks
+Can be accessed at turnTimeoutMinutes_skills.md to see the full file.
+```
+  "rooms": {
+    "turnTimeoutMinutes": 20
+  }
+```
+
+
+
+MCP overload especially for complex tasks are common and to prevent it add this to the end of the agent soul.md 
+When you see errors like ```Same call repeated 5× — tool: MCP: tool — it may be stuck``` and others, then add this prompt to the end of the md file and it will mostly reduce the chance of these errors appearing.
 ```
 Agent to prevent MCP overload
 
