@@ -115,3 +115,95 @@ never work around it by moving file contents through tool calls.
 If the same tool call or command fails or needs approval twice in a row,
 do not issue the identical call again. Change approach or ask the user.
 ```
+
+## Local Model Deployment — Troubleshooting Log (Ollama / Qwen3)
+
+**Hardware:** workstation, 2× RTX 3080 10 GB (20 GB total VRAM, no NVLink → PCIe split), 32 GB system RAM.
+
+**Planned tiers:** 8–9B local for sensitive work · Qwen3-30B-A3B (MoE) on a local school server · cloud for everything else.
+
+### Symptom
+
+Generation ran at ~10 tokens/sec — too slow to be usable.
+
+### Diagnosis
+
+10 tok/s is a **diagnostic, not a tuning problem**: it means a significant part of the model is running on **CPU**, not GPU. Two likely causes:
+
+1. **Wrong model loaded.** The dense 32B model at 4-bit is ~19–20 GB *before* KV cache. On a 20 GB box it cannot fully fit, so layers spill to the 32 GB system RAM and decode collapses to single digits.
+2. **Ollama only using one GPU.** Default scheduling can place the whole model on GPU 0 alone (10 GB), which also forces spill.
+
+There is **no "27B Qwen"** — the relevant models are **Qwen3-30B-A3B** (MoE, ~3B active parameters) and **Qwen2.5/3-32B** (dense). The MoE/dense choice is the whole answer.
+
+### Fixes (cheapest first)
+
+**1. Diagnose before changing anything**
+```bash
+ollama ps          # PROCESSOR column: "100% GPU" is good; "x%/y% CPU/GPU" = spill
+nvidia-smi         # both 3080s visible? how much VRAM used?
+```
+
+**2. Switch to the MoE model** — this alone is usually a 4–6× jump
+```bash
+ollama pull qwen3:30b-a3b
+ollama run qwen3:30b-a3b
+```
+4-bit weights ~17–18 GB, only ~3B active at a time → 40–60 tok/s single-stream on this box.
+
+**3. Force full GPU offload / both GPUs**
+```bash
+CUDA_VISIBLE_DEVICES=0,1 ollama serve
+```
+and in the Modelfile / runtime:
+```
+PARAMETER num_gpu 99
+```
+Note: `num_gpu` counts *layers*. On an MoE the expert tensors are the bulk of the mass, so "99 layers on GPU" does not guarantee the experts are. Trust `ollama ps` over the Modelfile.
+
+**4. Shrink and quantize the KV cache** (the other half of "does it fit")
+```bash
+OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0 OLLAMA_SCHED_SPREAD=1 ollama serve
+```
+- `KV_CACHE_TYPE=q8_0` halves KV VRAM — the biggest "fits vs doesn't" lever at longer context.
+- `SCHED_SPREAD=1` forces Ollama to use **both** GPUs. Default scheduling can pile the model onto GPU 0 alone, a common cause of phantom CPU spill on a dual-GPU rig.
+- `FLASH_ATTENTION=1` pairs with q8_0 KV (needs both).
+
+**5. Reduce context**
+```bash
+>>> /set parameter num_ctx 8192   # 32k context is a large VRAM delta
+```
+
+**6. Disable Qwen3 "thinking" when not needed.** `qwen3:30b-a3b` emits reasoning tokens before answering, so it *feels* 2–5× slower even at full GPU. Use `/no_think` in the prompt.
+
+**7. Verify with a number, not a vibe**
+```bash
+ollama run qwen3:30b-a3b --verbose   # prints eval rate = tok/s
+```
+Target: `ollama ps` reads `100% GPU` and eval rate lands ~40–60 tok/s.
+
+### Engine choice — Ollama vs llama.cpp vs vLLM
+
+The engine was never the bottleneck; **VRAM was**.
+
+| Engine | Best for | Notes on this hardware |
+|---|---|---|
+| **Ollama** (llama.cpp) | single / low-concurrency pilot | Right choice here; lowest ops overhead |
+| **llama.cpp server** | same, plus tuning knobs | `-ngl 99 -fa -ctk q8_0 -ctv q8_0 -c 8192 --split-mode layer` |
+| **vLLM** | high concurrency on a real serving box | Needs AWQ/GPTQ (not GGUF); paged-KV/CUDA-graph overhead; won't fit 30B MoE on 20 GB |
+
+- On a 20 GB box, vLLM's own overhead is *worse* than Ollama's. The wall is VRAM, not software: 20 GB cannot hold 17–18 GB of MoE weights *plus* batching headroom.
+- vLLM would **not** fix 10 tok/s — that is CPU offload, and vLLM would likely OOM or refuse.
+- The GGUF MoE **cannot load in vLLM at all**; it needs a different artifact (AWQ/GPTQ).
+
+### Ceiling and migration trigger
+
+This workstation is a **pilot tier only**. Realistic concurrency: 1–2 users fine, 3–5 usable with rising latency, class-size or admin-desk concurrency collapses. 100+ staff needs a **dedicated serving box (48–96 GB+ VRAM) running vLLM**.
+
+**Move to vLLM when:** sustained **≥8 concurrent users** past the P95 latency target, **or** long-context/RAG at **≥4 concurrent** — *and* you have **≥48 GB VRAM**. Until then, stay on Ollama.
+
+### Three-pillar check
+
+- **Privacy:** local 8–9B for sensitive and student work is the strongest play; keep student data off mainland processing nodes and keep the school's PDPO duties (parent-consent notices on cross-border transfer) in view.
+- **Sustainability:** the 30B tier on a single workstation is the weakest link — no SLA, no redundancy, PCIe-split. Fine as a pilot, not as school infrastructure.
+- **Functions:** MoE gets you a usable single-user tier; it does not make this box a shared school service.
+
