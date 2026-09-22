@@ -131,7 +131,7 @@ Generation ran at ~10 tokens/sec — too slow to be usable.
 10 tok/s is a **diagnostic, not a tuning problem**: it means a significant part of the model is running on **CPU**, not GPU. Two likely causes:
 
 1. **Wrong model loaded.** The dense 32B model at 4-bit is ~19–20 GB *before* KV cache. On a 20 GB box it cannot fully fit, so layers spill to the 32 GB system RAM and decode collapses to single digits.
-2. **Ollama only using one GPU.** Default scheduling can place the whole model on GPU 0 alone (10 GB), which also forces spill.
+2. **Ollama not spreading across both GPUs.** Ollama's official FAQ states it already auto-spreads a model across GPUs when it will not fit on one, so "default piles everything on GPU 0" is *not* documented behavior. Treat this as a possible cause to verify with `ollama ps` / `nvidia-smi`, not an assumption.
 
 There is **no "27B Qwen"** — the relevant models are **Qwen3-30B-A3B** (MoE, ~3B active parameters) and **Qwen2.5/3-32B** (dense). The MoE/dense choice is the whole answer.
 
@@ -165,7 +165,7 @@ Note: `num_gpu` counts *layers*. On an MoE the expert tensors are the bulk of th
 OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0 OLLAMA_SCHED_SPREAD=1 ollama serve
 ```
 - `KV_CACHE_TYPE=q8_0` halves KV VRAM — the biggest "fits vs doesn't" lever at longer context.
-- `SCHED_SPREAD=1` forces Ollama to use **both** GPUs. Default scheduling can pile the model onto GPU 0 alone, a common cause of phantom CPU spill on a dual-GPU rig.
+- `SCHED_SPREAD=1` — **undocumented / experimental**, not in Ollama's official docs. If used, verify the effect with `ollama ps`; Ollama's FAQ states it already auto-spreads a model across GPUs when it will not fit on one, so this is a last-resort lever, not a required setting.
 - `FLASH_ATTENTION=1` pairs with q8_0 KV (needs both).
 
 **5. Reduce context**
@@ -193,13 +193,20 @@ The engine was never the bottleneck; **VRAM was**.
 
 - On a 20 GB box, vLLM's own overhead is *worse* than Ollama's. The wall is VRAM, not software: 20 GB cannot hold 17–18 GB of MoE weights *plus* batching headroom.
 - vLLM would **not** fix 10 tok/s — that is CPU offload, and vLLM would likely OOM or refuse.
-- The GGUF MoE **cannot load in vLLM at all**; it needs a different artifact (AWQ/GPTQ).
+- The GGUF MoE path is **not supported / not recommended** in vLLM (GGUF support is limited/experimental and MoE+GGUF is effectively unsupported); use an **AWQ/GPTQ** (or FP8) artifact for vLLM instead.
 
 ### Ceiling and migration trigger
 
 This workstation is a **pilot tier only**. Realistic concurrency: 1–2 users fine, 3–5 usable with rising latency, class-size or admin-desk concurrency collapses. 100+ staff needs a **dedicated serving box (48–96 GB+ VRAM) running vLLM**.
 
 **Move to vLLM when:** sustained **≥8 concurrent users** past the P95 latency target, **or** long-context/RAG at **≥4 concurrent** — *and* you have **≥48 GB VRAM**. Until then, stay on Ollama.
+
+### Version notes (verified)
+
+- **vLLM ≥ v0.8.5** is the first release with Qwen3 / Qwen3-MoE support (release notes: "Day 0 support for Qwen3 and Qwen3MoE").
+- **`OLLAMA_FLASH_ATTENTION`** and **`OLLAMA_KV_CACHE_TYPE`** (`f16`/`q8_0`/`q4_0`) are documented in Ollama's official FAQ; quantized KV **requires** Flash Attention.
+- **`OLLAMA_SCHED_SPREAD`** is **undocumented/experimental** — not in official docs (see Fix 4).
+- Confirm your own builds before quoting numbers: `ollama -v`, and check the vLLM release notes for MoE support.
 
 ### Three-pillar check
 
