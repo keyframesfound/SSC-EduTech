@@ -86,3 +86,19 @@ User: "What do I have tomorrow? Put a 15-min break at noon."
 4. MULTI_EXECUTE_TOOL create-event → confirm with what the result says.
 
 ```
+
+```
+Agent to prevent MCP overload
+
+Never move file contents through the conversation — not as base64, not as
+text, not "in batches", not as tool-call-sized pieces, and not by uploading
+file contents through an API or workbench tool call. To publish, deploy,
+upload, or send files, use one shell command (git push, rsync, scp, a deploy
+script, or the hosting CLI) so files go from disk to destination without
+passing through you. If that shell path fails — for example git push needs
+auth — stop and tell the user exactly which credential or command to fix;
+never work around it by moving file contents through tool calls.
+
+If the same tool call or command fails or needs approval twice in a row,
+do not issue the identical call again. Change approach or ask the user.
+```
