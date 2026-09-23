@@ -1,25 +1,16 @@
-# SSC-EduTech
+# SSC-EduTech: lab notes on AI systems for school technology work
 
 Improving technology for education.
 
-This README shows what the different AI tools in SSC-EduTech are good for. Each job can use the stack that fits it: weekly admin as an email workflow, multi-step tasks through an agent council, printable parts from a CAD model, and sensitive work on a machine the school controls.
+## Abstract
 
-The sections below are working notes from setups we have actually used.
+SSC-EduTech is an education-technology exploration of several AI systems, with each system tried on a different kind of school work. These notes record what each one was used for and what was actually written down. Amazon Quick (AWS) automates an Education Bureau (EDB) teacher-training path from the public calendar to a weekly email and then to the teacher's calendar, including a conflict message and an override reply. OpenManusBot is under test for multi-agent task automation and councils, with Composio connectors, a 20-minute turn limit, and a short rule against repeated tool calls. GrokBot is the desktop coordinator for orchestration, repository and site work, documentation, and handoffs to other agents; a scored results log for that role is still open. A local Ollama and Qwen deployment was examined for on-prem privacy on one dual-GPU workstation. Z.ai assisted a printable mechanical design, a buoyancy profiling float, reproduced here as a four-panel print-plate figure.
 
-## Capabilities at a glance
+## 1. Amazon Quick (AWS) Research
 
-| AI stack | Strength | Detail in this README |
-| --- | --- | --- |
-| **[Amazon Quick (AWS)](#amazon-quick-aws)** | Workflow automation: EDB training calendar → weekly email → calendar, with conflict checks and an override | Both flow prompts |
-| **[OpenManusBot](#openmanusbot)** | Task automation and AI councils (Kimi K3, OpenCode free models, Composio MCP) | Tool-calling prompt, turn timeout, MCP overload note |
-| **[CAD and 3D design](#cad-and-3d-design)** | Printable mechanical design for lessons and competition robotics | Buoyancy profiling float and print-plate layout |
-| **[Local models (Ollama and Qwen)](#local-models-ollama-and-qwen)** | On-prem privacy for sensitive and student work | Workstation troubleshooting log |
+This section records an email-and-calendar study for an ICT teacher who follows the EDB training calendar in Hong Kong.
 
-## Amazon Quick (AWS)
-
-**Good for:** workflow automation a teacher can run from email.
-
-### Personal email tracker for EDB teacher training
+### Methods
 
 The tracker checks the EDB training calendar every week. It searches a keyword (for example ICT) and collects notices added in the last 7 days, then emails the teacher a weekly summary of classes and training that concern them.
 
@@ -29,6 +20,8 @@ The teacher replies on that thread, including a reply to the trigger address `re
 2. See which sessions the teacher wants on their calendar.
 3. If a session does not conflict with the current calendar, add it and send a confirmation.
 4. If it does conflict, send a second email that says so. The teacher can reply to that email to override the conflict and add the session anyway.
+
+The two prompts below are the ones submitted to Amazon Quick. Spelling is left as submitted.
 
 ```
 Prompt 1 (Main Flow):
@@ -40,15 +33,23 @@ Prompt 2 (Secondary calendar flow):
 I am an ICT teacher of a secondary school, in charge of teaching senior form ICT and the IT Department in Hong Kong. I want a weekly summary sent to my email  ryanyeung0925@gmail.com, please go to https://tcs.edb.gov.hk/tcs/publicCalendar/start.htm and retrieve relavant courses in the past 7 days
 ```
 
-## OpenManusBot
+### Observations
 
-**Good for:** automating tasks and running an AI council, where a stronger model directs the work and apps are reached through tools.
+As specified, the study has two stages. The weekly stage reads [the public EDB training calendar](https://tcs.edb.gov.hk/tcs/publicCalendar/start.htm) and sends a summary of relevant courses from the past 7 days. The reply stage, started through `replytocal@aws.com`, reads which sessions the teacher wants, writes non-conflicting sessions to the calendar, and on a conflict sends a further email that the teacher can answer in order to add the session anyway. Delivery counts, time saved, and error rates are left for a later entry.
 
-OpenManusBot is an alternative to grokbot. It is currently used to automate tasks and to try AI councils. Testing so far includes Kimi K3 and OpenCode (which has a free model). OpenAI-compatible models have also been tried; in this setup they could not run fully automated tasks on their own.
+### Discussion
 
-<img width="944" height="708" alt="Screenshot 2026-09-20 at 16 30 04" src="https://github.com/user-attachments/assets/85bb625d-b6b8-4175-9f02-a344389a2dee" />
+The procedure keeps the teacher inside email: a weekly summary, a reply, and a calendar write, with an explicit path when a proposed session overlaps an existing one. The second prompt limits the case to senior-form ICT and IT-department training notices.
 
-Local 8B and 14B models cannot drive connector MCPs, so they stay off the chief-of-staff role. Use a stronger model — Kimi K3, Grok, or an OpenCode free model — as the main chief of staff, and a local model such as Qwen 120B as the secrets model for material that should stay private. Hardware limits and the Ollama/Qwen troubleshooting log are in [Local models](#local-models-ollama-and-qwen).
+## 2. OpenManusBot
+
+OpenManusBot is an alternative to GrokBot ([Section 3](#3-grokbot)). In these notes it is the system under test for automated tasks and AI councils.
+
+### Methods
+
+Testing so far includes Kimi K3 and OpenCode, which provides a free model. OpenAI-compatible models were also tried. External apps (Gmail, Calendar, Slack, Notion, and others) are reached only through Composio tool calls. The prompt given to the agent is reproduced below in full.
+
+Local 8B and 14B models cannot drive connector MCPs, so they stay off the chief-of-staff role. The working arrangement is a stronger chief of staff — Kimi K3, Grok, or an OpenCode free model — with a local model such as Qwen 120B as the secrets model for material that should stay private. Hardware limits for that local model are in [Section 4](#4-local-llm).
 
 ```
 Prompt for Local Agent to Access Tools
@@ -118,9 +119,7 @@ User: "What do I have tomorrow? Put a 15-min break at noon."
 
 ```
 
-### Turn timeout
-
-Raising the agent timeout from 5 minutes to 20 minutes lets the agent work on larger, more complex tasks. The safe edit procedure (quit, back up, merge the JSON, relaunch) is in [`turnTimeoutMinutes_skills.md`](turnTimeoutMinutes_skills.md).
+The room turn timeout was raised from 5 minutes to 20 minutes so the agent can continue on larger tasks. The safe edit procedure (quit, back up, merge the JSON, relaunch) is in [`turnTimeoutMinutes_skills.md`](turnTimeoutMinutes_skills.md).
 
 ```
   "rooms": {
@@ -128,9 +127,7 @@ Raising the agent timeout from 5 minutes to 20 minutes lets the agent work on la
   }
 ```
 
-### MCP overload
-
-MCP overload is common on complex tasks. When errors such as `Same call repeated 5× — tool: MCP: tool — it may be stuck` show up, add the block below to the end of the agent `soul.md`. It reduces how often those loops appear.
+Repeated MCP calls are common on complex tasks. When warnings such as `Same call repeated 5× — tool: MCP: tool — it may be stuck` appear, the block below is added to the end of the agent `soul.md`.
 
 ```
 Agent to prevent MCP overload
@@ -148,50 +145,62 @@ If the same tool call or command fails or needs approval twice in a row,
 do not issue the identical call again. Change approach or ask the user.
 ```
 
-## CAD and 3D design
+### Observations
 
-**Good for:** printable mechanical design for lessons and competition robotics — a solid model, a print orientation, and a plate layout a workshop can slice.
+<img width="944" height="708" alt="OpenManusBot session used for task automation and an AI council" src="https://github.com/user-attachments/assets/85bb625d-b6b8-4175-9f02-a344389a2dee" />
 
-CAD / 3D design AI is the stack for parts that have to leave the screen. The study below is a buoyancy profiling float split into three pieces that share one print plate: a cap, a nose, and a body. The body is shown transparent so the internal rails and strap tabs stay visible for assembly. Dimensions on the nose are the labels from the model (77 tall = 12 spigot + 4 flange + 61 dome), in the units of the source file.
+*Figure. OpenManusBot session from the council and task-automation trials.*
 
-![Buoyancy profiling float prepared for 3D printing: cap printed plate-down, nose, transparent body with internal rails and strap tabs, and the print-plate STL layout](docs/ai-capabilities/cad-float-print-plate.png)
+Fully automated tasks in this setup ran with Kimi K3 or an OpenCode free model as chief of staff. OpenAI-compatible models were tried; on their own they left the automated task unfinished. Local 8B and 14B models did not operate the connector MCPs, which is why the secrets-model role is assigned to a larger local model (see [Section 4](#4-local-llm)). The `soul.md` block is aimed at two failure modes: moving file contents through the conversation, and issuing the same failing call again. A counted before/after of the repeated-call warning can be added when it is collected.
 
-*Buoyancy profiling float, four views. Top left: cap (print plate-down). Top right: nose, labeled 77 tall (12 spigot + 4 flange + 61 dome). Bottom left: transparent body with internal rails and strap tabs. Bottom right: the three parts in the `print_plate.stl` layout.*
+### Discussion
 
-## Local models (Ollama and Qwen)
+OpenManusBot is the strand for tool-using councils. GrokBot remains the desktop coordinator ([Section 3](#3-grokbot)). The split between a stronger chief of staff and a local secrets model is the same privacy split examined in [Section 4](#4-local-llm).
 
-**Good for:** on-prem privacy. Sensitive school work and student data stay on hardware the school controls, which is the practical way to keep that data off an outside processing node.
+## 3. GrokBot
 
-Planned tiers on the workstation described below:
+GrokBot is the desktop, coordinator-style assistant in this education-technology stack. Earlier notes in this repository introduce OpenManusBot as an alternative under test. This section records the role GrokBot holds in the project and leaves a place for later results.
+
+### Methods
+
+Work assigned to GrokBot is coordination rather than a single closed workflow. In practice that has meant:
+
+- Orchestrating a multi-step school-technology task and deciding which part stays with GrokBot.
+- Repository and site work: reading the project, editing notes and site material, and keeping the written record aligned with what was tried.
+- Multi-agent teaming: handing a bounded piece of work to another agent, including a cloud coding session or the OpenManusBot council in [Section 2](#2-openmanusbot), then taking the result back into the project.
+- Documentation of the other strands (the EDB email flow, the local-model log, and the Z.ai design study).
+
+No separate tool prompt, timeout file, or connector list is stored for GrokBot in this repository. Those details, where they exist, belong to the OpenManusBot trial.
+
+### Observations
+
+The strength observed so far is the coordinator role itself: GrokBot is where orchestration, repository and site edits, documentation, and handoffs meet. It is used beside OpenManusBot, which carries the Composio tool loop and the council trials. Side-by-side scores against OpenManusBot, Kimi K3, or the local models are left for a later entry.
+
+### Results
+
+A results log is reserved here for later entries. A useful entry records the task, whether GrokBot did the work directly or handed it on, which agent received the handoff, and whether the handoff finished. Completion counts and timings are omitted until those entries exist.
+
+### Discussion
+
+GrokBot fits the work that spans several systems in these notes: keeping the written record, editing the repository, and passing a well-bounded task to OpenManusBot or a cloud coding session. Until the results log has entries, this section stays a methods note.
+
+## 4. Local LLM
+
+This section records an on-prem privacy trial: Ollama and Qwen on a school workstation, so sensitive work and student-related material can stay on hardware the school controls.
+
+### Methods
+
+Planned tiers on the machine below:
 
 - **8–9B local** for sensitive work.
 - **Qwen3-30B-A3B** (mixture-of-experts) on a local school server.
 - **Cloud models** for everything else.
 
-The same split shows up in the OpenManusBot notes: 8B and 14B models could not drive connector MCPs, so a stronger chief-of-staff model handles tools and the local model handles private material.
-
-The log below is from one workstation (2× RTX 3080 10 GB, 32 GB RAM). Speeds quoted there are observations on that machine.
-
-### Troubleshooting log (Ollama / Qwen3)
+The same split appears in the OpenManusBot trial: 8B and 14B models could not drive connector MCPs, so a stronger chief-of-staff model handles tools and the local model handles private material.
 
 **Hardware:** workstation, 2× RTX 3080 10 GB (20 GB total VRAM, no NVLink → PCIe split), 32 GB system RAM.
 
-**Planned tiers:** 8–9B local for sensitive work · Qwen3-30B-A3B (MoE) on a local school server · cloud for everything else.
-
-#### Symptom
-
-Generation ran at ~10 tokens/sec — too slow to be usable.
-
-#### Diagnosis
-
-10 tok/s is a **diagnostic, not a tuning problem**: it means a significant part of the model is running on **CPU**, not GPU. Two likely causes:
-
-1. **Wrong model loaded.** The dense 32B model at 4-bit is ~19–20 GB *before* KV cache. On a 20 GB box it cannot fully fit, so layers spill to the 32 GB system RAM and decode collapses to single digits.
-2. **Ollama not spreading across both GPUs.** Ollama's official FAQ states it already auto-spreads a model across GPUs when it will not fit on one, so "default piles everything on GPU 0" is *not* documented behavior. Treat this as a possible cause to verify with `ollama ps` / `nvidia-smi`, not an assumption.
-
-There is **no "27B Qwen"** — the relevant models are **Qwen3-30B-A3B** (MoE, ~3B active parameters) and **Qwen2.5/3-32B** (dense). The MoE/dense choice is the whole answer.
-
-#### Fixes (cheapest first)
+The interventions below were the procedure under test, cheapest first. Speeds are observations or targets for this machine only.
 
 **1. Diagnose before changing anything**
 
@@ -206,8 +215,6 @@ nvidia-smi         # both 3080s visible? how much VRAM used?
 ollama pull qwen3:30b-a3b
 ollama run qwen3:30b-a3b
 ```
-
-4-bit weights ~17–18 GB, only ~3B active at a time → 40–60 tok/s single-stream on this box.
 
 **3. Force full GPU offload / both GPUs**
 
@@ -247,7 +254,18 @@ OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0 OLLAMA_SCHED_SPREAD=1 ollama 
 ollama run qwen3:30b-a3b --verbose   # prints eval rate = tok/s
 ```
 
-Target: `ollama ps` reads `100% GPU` and eval rate lands ~40–60 tok/s.
+### Results
+
+Generation on the initial load ran at ~10 tokens/sec, too slow to be usable.
+
+10 tok/s is a **diagnostic, not a tuning problem**: it means a significant part of the model is running on **CPU**, not GPU. Two likely causes:
+
+1. **Wrong model loaded.** The dense 32B model at 4-bit is ~19–20 GB *before* KV cache. On a 20 GB box it cannot fully fit, so layers spill to the 32 GB system RAM and decode collapses to single digits.
+2. **Ollama not spreading across both GPUs.** Ollama's official FAQ states it already auto-spreads a model across GPUs when it will not fit on one, so "default piles everything on GPU 0" is *not* documented behavior. Treat this as a possible cause to verify with `ollama ps` / `nvidia-smi`, not an assumption.
+
+There is **no "27B Qwen"** — the relevant models are **Qwen3-30B-A3B** (MoE, ~3B active parameters) and **Qwen2.5/3-32B** (dense). The MoE/dense choice is the whole answer.
+
+For the MoE weights themselves: 4-bit weights ~17–18 GB, only ~3B active at a time → 40–60 tok/s single-stream on this box. That figure is the expected single-stream rate once the model is fully on GPU. The check used in this log is `ollama ps` reading `100% GPU`, with `ollama run qwen3:30b-a3b --verbose` printing the eval rate. Target: eval rate lands ~40–60 tok/s.
 
 #### Engine choice — Ollama vs llama.cpp vs vLLM
 
@@ -263,12 +281,6 @@ The engine was never the bottleneck; **VRAM was**.
 - vLLM would **not** fix 10 tok/s — that is CPU offload, and vLLM would likely OOM or refuse.
 - The GGUF MoE path is **not supported / not recommended** in vLLM (GGUF support is limited/experimental and MoE+GGUF is effectively unsupported); use an **AWQ/GPTQ** (or FP8) artifact for vLLM instead.
 
-#### Ceiling and migration trigger
-
-This workstation is a **pilot tier only**. Realistic concurrency: 1–2 users fine, 3–5 usable with rising latency, class-size or admin-desk concurrency collapses. 100+ staff needs a **dedicated serving box (48–96 GB+ VRAM) running vLLM**.
-
-**Move to vLLM when:** sustained **≥8 concurrent users** past the P95 latency target, **or** long-context/RAG at **≥4 concurrent** — *and* you have **≥48 GB VRAM**. Until then, stay on Ollama.
-
 #### Version notes (verified)
 
 - **vLLM ≥ v0.8.5** is the first release with Qwen3 / Qwen3-MoE support (release notes: "Day 0 support for Qwen3 and Qwen3MoE").
@@ -276,8 +288,34 @@ This workstation is a **pilot tier only**. Realistic concurrency: 1–2 users fi
 - **`OLLAMA_SCHED_SPREAD`** is **undocumented/experimental** — not in official docs (see Fix 4).
 - Confirm your own builds before quoting numbers: `ollama -v`, and check the vLLM release notes for MoE support.
 
-#### Three-pillar check
+### Discussion
+
+This workstation is a **pilot tier only**. Realistic concurrency: 1–2 users fine, 3–5 usable with rising latency, class-size or admin-desk concurrency collapses. 100+ staff needs a **dedicated serving box (48–96 GB+ VRAM) running vLLM**.
+
+**Move to vLLM when:** sustained **≥8 concurrent users** past the P95 latency target, **or** long-context/RAG at **≥4 concurrent** — *and* you have **≥48 GB VRAM**. Until then, stay on Ollama.
+
+Three-pillar check:
 
 - **Privacy:** local 8–9B for sensitive and student work is the strongest play; keep student data off mainland processing nodes and keep the school's PDPO duties (parent-consent notices on cross-border transfer) in view.
 - **Sustainability:** the 30B tier on a single workstation is the weakest link — no SLA, no redundancy, PCIe-split. Fine as a pilot, not as school infrastructure.
 - **Functions:** MoE gets you a usable single-user tier; it does not make this box a shared school service.
+
+## 5. Z.ai (CAD / mechanical design case study)
+
+Z.ai is the system used here for printable mechanical design. The case is a buoyancy profiling float for school technology work, including competition robotics: parts a workshop can slice, print, and assemble.
+
+### Methods
+
+Z.ai generated and assisted the solid model. The float is split into three pieces that share one print plate: a cap, a nose, and a body. The cap is oriented print-plate-down. The nose is labeled on the model as 77 tall, made up of a 12 spigot, a 4 flange, and a 61 dome, in the units of the source file. The body is shown transparent so the internal rails and strap tabs stay visible before printing. The plate layout is the file `print_plate.stl`.
+
+### Results
+
+The design output is the four-panel figure below: a Z.ai render of the model and the print-plate layout.
+
+![Z.ai design of a buoyancy profiling float: cap printed plate-down, nose labeled 77 tall, transparent body with internal rails and strap tabs, and the print-plate STL layout](docs/ai-capabilities/cad-float-print-plate.png)
+
+*Figure. Z.ai CAD study of a buoyancy profiling float, laid out for one print plate. Top left: cap (print plate-down). Top right: nose, labeled 77 tall (12 spigot + 4 flange + 61 dome). Bottom left: transparent body with internal rails and strap tabs. Bottom right: the three parts in the `print_plate.stl` layout.*
+
+### Discussion
+
+The figure is enough to check print orientation, the nose stack-up, and whether the internal rails and strap tabs are present in the body. A later entry can record the sliced plate, the printer and material, and whether the three parts seated together. Print and fit-up results are reserved for that entry.
