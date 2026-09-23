@@ -1,23 +1,54 @@
 # SSC-EduTech
-Improving technology for education
 
-## Amazon Quick
-### Personal Email Tracker for EDB Teacher training 
-The personal email tracker for EDB teacher tracking checks the EDB website every week, searches keyword (e.g. ICT) and sees all of the recent notices that are added from the last 7 days. Then the tracker sends an email to the respective teacher and notifies them of classes / trainings that concern them. An email is sent to their inbox every week and they can reply to the email while also replying to the trigger email (replytocal@aws.com). All of this then triggers the second flow which runs when the trigger email is interacted with. The second flow checks the user email inbox to see the latest weekly summary then sees which days the teacher would like to add. If it does not conflict with their current calendar it would be added, but in the case that it conflicts with their current calendar, there would be a secondary email that tells the user that there is a conflict. On the secondary email, the user may override this conflict and add it anyways.
+Improving technology for education.
+
+This README shows what the different AI tools in SSC-EduTech are good for. Each job can use the stack that fits it: weekly admin as an email workflow, multi-step tasks through an agent council, printable parts from a CAD model, and sensitive work on a machine the school controls.
+
+The sections below are working notes from setups we have actually used.
+
+## Capabilities at a glance
+
+| AI stack | Strength | Detail in this README |
+| --- | --- | --- |
+| **[Amazon Quick (AWS)](#amazon-quick-aws)** | Workflow automation: EDB training calendar → weekly email → calendar, with conflict checks and an override | Both flow prompts |
+| **[OpenManusBot](#openmanusbot)** | Task automation and AI councils (Kimi K3, OpenCode free models, Composio MCP) | Tool-calling prompt, turn timeout, MCP overload note |
+| **[CAD and 3D design](#cad-and-3d-design)** | Printable mechanical design for lessons and competition robotics | Buoyancy profiling float and print-plate layout |
+| **[Local models (Ollama and Qwen)](#local-models-ollama-and-qwen)** | On-prem privacy for sensitive and student work | Workstation troubleshooting log |
+
+## Amazon Quick (AWS)
+
+**Good for:** workflow automation a teacher can run from email.
+
+### Personal email tracker for EDB teacher training
+
+The tracker checks the EDB training calendar every week. It searches a keyword (for example ICT) and collects notices added in the last 7 days, then emails the teacher a weekly summary of classes and training that concern them.
+
+The teacher replies on that thread, including a reply to the trigger address `replytocal@aws.com`. That reply starts the second flow:
+
+1. Read the latest weekly ICT course summary in the inbox.
+2. See which sessions the teacher wants on their calendar.
+3. If a session does not conflict with the current calendar, add it and send a confirmation.
+4. If it does conflict, send a second email that says so. The teacher can reply to that email to override the conflict and add the session anyway.
+
 ```
 Prompt 1 (Main Flow):
 Make an automated email flow that when triggered checks the user email inbox for the latest Weekly ICT Course Summary from EDB Training Calendar subject email. Check the replies and the email content to see which events the teacher would like to add to their calender, if there are no conflicts with the teachers calender then add to the calender and send a new email saying added. If there are conflicts the email is still sent to the user and it tells them there are conflicts, and the user is able to reply to this email to override it and still add it to calender even if its conflicted
 ```
+
 ```
 Prompt 2 (Secondary calendar flow):
 I am an ICT teacher of a secondary school, in charge of teaching senior form ICT and the IT Department in Hong Kong. I want a weekly summary sent to my email  ryanyeung0925@gmail.com, please go to https://tcs.edb.gov.hk/tcs/publicCalendar/start.htm and retrieve relavant courses in the past 7 days
 ```
+
 ## OpenManusBot
-The OpenManusBot is an alternative to grokbot. Currently it is used in automating tasks and creating AI councils. I am testing the use of This alternative with KimiK3 and also OpenCode, which has a free model version. I also have tested with OpenAI compatible ones, however it is unable to do fully automated tasks. 
+
+**Good for:** automating tasks and running an AI council, where a stronger model directs the work and apps are reached through tools.
+
+OpenManusBot is an alternative to grokbot. It is currently used to automate tasks and to try AI councils. Testing so far includes Kimi K3 and OpenCode (which has a free model). OpenAI-compatible models have also been tried; in this setup they could not run fully automated tasks on their own.
 
 <img width="944" height="708" alt="Screenshot 2026-09-20 at 16 30 04" src="https://github.com/user-attachments/assets/85bb625d-b6b8-4175-9f02-a344389a2dee" />
 
-As for local models, 8B and 14B are out of the picture as 8B and 14B both are unable to use connector MCPs. As per suggestion, I advise the use of smart models like Kimik3 or Grok or Open Code Free Models as the main chief of staff while using local models like Quen 120B to be the secrets model.
+Local 8B and 14B models cannot drive connector MCPs, so they stay off the chief-of-staff role. Use a stronger model — Kimi K3, Grok, or an OpenCode free model — as the main chief of staff, and a local model such as Qwen 120B as the secrets model for material that should stay private. Hardware limits and the Ollama/Qwen troubleshooting log are in [Local models](#local-models-ollama-and-qwen).
 
 ```
 Prompt for Local Agent to Access Tools
@@ -87,19 +118,20 @@ User: "What do I have tomorrow? Put a 15-min break at noon."
 
 ```
 
-In addition the change of the agent timeout minute. 
-By changing from 5 to now 20 min it allows the Agent to work on larger and more complex tasks
-Can be accessed at turnTimeoutMinutes_skills.md to see the full file.
+### Turn timeout
+
+Raising the agent timeout from 5 minutes to 20 minutes lets the agent work on larger, more complex tasks. The safe edit procedure (quit, back up, merge the JSON, relaunch) is in [`turnTimeoutMinutes_skills.md`](turnTimeoutMinutes_skills.md).
+
 ```
   "rooms": {
     "turnTimeoutMinutes": 20
   }
 ```
 
+### MCP overload
 
+MCP overload is common on complex tasks. When errors such as `Same call repeated 5× — tool: MCP: tool — it may be stuck` show up, add the block below to the end of the agent `soul.md`. It reduces how often those loops appear.
 
-MCP overload especially for complex tasks are common and to prevent it add this to the end of the agent soul.md 
-When you see errors like ```Same call repeated 5× — tool: MCP: tool — it may be stuck``` and others, then add this prompt to the end of the md file and it will mostly reduce the chance of these errors appearing.
 ```
 Agent to prevent MCP overload
 
@@ -116,17 +148,41 @@ If the same tool call or command fails or needs approval twice in a row,
 do not issue the identical call again. Change approach or ask the user.
 ```
 
-## Local Model Deployment — Troubleshooting Log (Ollama / Qwen3)
+## CAD and 3D design
+
+**Good for:** printable mechanical design for lessons and competition robotics — a solid model, a print orientation, and a plate layout a workshop can slice.
+
+CAD / 3D design AI is the stack for parts that have to leave the screen. The study below is a buoyancy profiling float split into three pieces that share one print plate: a cap, a nose, and a body. The body is shown transparent so the internal rails and strap tabs stay visible for assembly. Dimensions on the nose are the labels from the model (77 tall = 12 spigot + 4 flange + 61 dome), in the units of the source file.
+
+![Buoyancy profiling float prepared for 3D printing: cap printed plate-down, nose, transparent body with internal rails and strap tabs, and the print-plate STL layout](docs/ai-capabilities/cad-float-print-plate.png)
+
+*Buoyancy profiling float, four views. Top left: cap (print plate-down). Top right: nose, labeled 77 tall (12 spigot + 4 flange + 61 dome). Bottom left: transparent body with internal rails and strap tabs. Bottom right: the three parts in the `print_plate.stl` layout.*
+
+## Local models (Ollama and Qwen)
+
+**Good for:** on-prem privacy. Sensitive school work and student data stay on hardware the school controls, which is the practical way to keep that data off an outside processing node.
+
+Planned tiers on the workstation described below:
+
+- **8–9B local** for sensitive work.
+- **Qwen3-30B-A3B** (mixture-of-experts) on a local school server.
+- **Cloud models** for everything else.
+
+The same split shows up in the OpenManusBot notes: 8B and 14B models could not drive connector MCPs, so a stronger chief-of-staff model handles tools and the local model handles private material.
+
+The log below is from one workstation (2× RTX 3080 10 GB, 32 GB RAM). Speeds quoted there are observations on that machine.
+
+### Troubleshooting log (Ollama / Qwen3)
 
 **Hardware:** workstation, 2× RTX 3080 10 GB (20 GB total VRAM, no NVLink → PCIe split), 32 GB system RAM.
 
 **Planned tiers:** 8–9B local for sensitive work · Qwen3-30B-A3B (MoE) on a local school server · cloud for everything else.
 
-### Symptom
+#### Symptom
 
 Generation ran at ~10 tokens/sec — too slow to be usable.
 
-### Diagnosis
+#### Diagnosis
 
 10 tok/s is a **diagnostic, not a tuning problem**: it means a significant part of the model is running on **CPU**, not GPU. Two likely causes:
 
@@ -135,40 +191,50 @@ Generation ran at ~10 tokens/sec — too slow to be usable.
 
 There is **no "27B Qwen"** — the relevant models are **Qwen3-30B-A3B** (MoE, ~3B active parameters) and **Qwen2.5/3-32B** (dense). The MoE/dense choice is the whole answer.
 
-### Fixes (cheapest first)
+#### Fixes (cheapest first)
 
 **1. Diagnose before changing anything**
+
 ```bash
 ollama ps          # PROCESSOR column: "100% GPU" is good; "x%/y% CPU/GPU" = spill
 nvidia-smi         # both 3080s visible? how much VRAM used?
 ```
 
 **2. Switch to the MoE model** — this alone is usually a 4–6× jump
+
 ```bash
 ollama pull qwen3:30b-a3b
 ollama run qwen3:30b-a3b
 ```
+
 4-bit weights ~17–18 GB, only ~3B active at a time → 40–60 tok/s single-stream on this box.
 
 **3. Force full GPU offload / both GPUs**
+
 ```bash
 CUDA_VISIBLE_DEVICES=0,1 ollama serve
 ```
+
 and in the Modelfile / runtime:
+
 ```
 PARAMETER num_gpu 99
 ```
+
 Note: `num_gpu` counts *layers*. On an MoE the expert tensors are the bulk of the mass, so "99 layers on GPU" does not guarantee the experts are. Trust `ollama ps` over the Modelfile.
 
 **4. Shrink and quantize the KV cache** (the other half of "does it fit")
+
 ```bash
 OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0 OLLAMA_SCHED_SPREAD=1 ollama serve
 ```
+
 - `KV_CACHE_TYPE=q8_0` halves KV VRAM — the biggest "fits vs doesn't" lever at longer context.
 - `SCHED_SPREAD=1` — **undocumented / experimental**, not in Ollama's official docs. If used, verify the effect with `ollama ps`; Ollama's FAQ states it already auto-spreads a model across GPUs when it will not fit on one, so this is a last-resort lever, not a required setting.
 - `FLASH_ATTENTION=1` pairs with q8_0 KV (needs both).
 
 **5. Reduce context**
+
 ```bash
 >>> /set parameter num_ctx 8192   # 32k context is a large VRAM delta
 ```
@@ -176,17 +242,19 @@ OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0 OLLAMA_SCHED_SPREAD=1 ollama 
 **6. Disable Qwen3 "thinking" when not needed.** `qwen3:30b-a3b` emits reasoning tokens before answering, so it *feels* 2–5× slower even at full GPU. Use `/no_think` in the prompt.
 
 **7. Verify with a number, not a vibe**
+
 ```bash
 ollama run qwen3:30b-a3b --verbose   # prints eval rate = tok/s
 ```
+
 Target: `ollama ps` reads `100% GPU` and eval rate lands ~40–60 tok/s.
 
-### Engine choice — Ollama vs llama.cpp vs vLLM
+#### Engine choice — Ollama vs llama.cpp vs vLLM
 
 The engine was never the bottleneck; **VRAM was**.
 
 | Engine | Best for | Notes on this hardware |
-|---|---|---|
+| --- | --- | --- |
 | **Ollama** (llama.cpp) | single / low-concurrency pilot | Right choice here; lowest ops overhead |
 | **llama.cpp server** | same, plus tuning knobs | `-ngl 99 -fa -ctk q8_0 -ctv q8_0 -c 8192 --split-mode layer` |
 | **vLLM** | high concurrency on a real serving box | Needs AWQ/GPTQ (not GGUF); paged-KV/CUDA-graph overhead; won't fit 30B MoE on 20 GB |
@@ -195,22 +263,21 @@ The engine was never the bottleneck; **VRAM was**.
 - vLLM would **not** fix 10 tok/s — that is CPU offload, and vLLM would likely OOM or refuse.
 - The GGUF MoE path is **not supported / not recommended** in vLLM (GGUF support is limited/experimental and MoE+GGUF is effectively unsupported); use an **AWQ/GPTQ** (or FP8) artifact for vLLM instead.
 
-### Ceiling and migration trigger
+#### Ceiling and migration trigger
 
 This workstation is a **pilot tier only**. Realistic concurrency: 1–2 users fine, 3–5 usable with rising latency, class-size or admin-desk concurrency collapses. 100+ staff needs a **dedicated serving box (48–96 GB+ VRAM) running vLLM**.
 
 **Move to vLLM when:** sustained **≥8 concurrent users** past the P95 latency target, **or** long-context/RAG at **≥4 concurrent** — *and* you have **≥48 GB VRAM**. Until then, stay on Ollama.
 
-### Version notes (verified)
+#### Version notes (verified)
 
 - **vLLM ≥ v0.8.5** is the first release with Qwen3 / Qwen3-MoE support (release notes: "Day 0 support for Qwen3 and Qwen3MoE").
 - **`OLLAMA_FLASH_ATTENTION`** and **`OLLAMA_KV_CACHE_TYPE`** (`f16`/`q8_0`/`q4_0`) are documented in Ollama's official FAQ; quantized KV **requires** Flash Attention.
 - **`OLLAMA_SCHED_SPREAD`** is **undocumented/experimental** — not in official docs (see Fix 4).
 - Confirm your own builds before quoting numbers: `ollama -v`, and check the vLLM release notes for MoE support.
 
-### Three-pillar check
+#### Three-pillar check
 
 - **Privacy:** local 8–9B for sensitive and student work is the strongest play; keep student data off mainland processing nodes and keep the school's PDPO duties (parent-consent notices on cross-border transfer) in view.
 - **Sustainability:** the 30B tier on a single workstation is the weakest link — no SLA, no redundancy, PCIe-split. Fine as a pilot, not as school infrastructure.
 - **Functions:** MoE gets you a usable single-user tier; it does not make this box a shared school service.
-
