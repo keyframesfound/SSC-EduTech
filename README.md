@@ -149,173 +149,69 @@ do not issue the identical call again. Change approach or ask the user.
 
 <img width="944" height="708" alt="OpenManusBot session used for task automation and an AI council" src="https://github.com/user-attachments/assets/85bb625d-b6b8-4175-9f02-a344389a2dee" />
 
-*Figure. OpenManusBot session from the council and task-automation trials.*
+As for local models, 8B and 14B are out of the picture as 8B and 14B both are unable to use connector MCPs. As per suggestion, I advise the use of smart models like Kimik3 or Grok or Open Code Free Models as the main chief of staff while using local models like Quen 120B to be the secrets model.
 
-Fully automated tasks in this setup ran with Kimi K3 or an OpenCode free model as chief of staff. OpenAI-compatible models were tried; on their own they left the automated task unfinished. Local 8B and 14B models did not operate the connector MCPs, which is why the secrets-model role is assigned to a larger local model (see [Section 4](#4-local-llm)). The `soul.md` block is aimed at two failure modes: moving file contents through the conversation, and issuing the same failing call again. A counted before/after of the repeated-call warning can be added when it is collected.
+## Local AI Server (Windows PC)
+A Windows PC runs models through [Ollama](https://ollama.com) and exposes an OpenAI-compatible API on port `11434`. opencode and OpenManusBot both point at this one endpoint, and [Tailscale](https://tailscale.com) makes the same address work from home or any other network.
 
-### Discussion
+### 1. Server setup (Windows)
+1. Update the GPU driver, then install Ollama from [ollama.com](https://ollama.com). It runs in the system tray on port `11434` and starts with Windows.
+2. Pull a model sized to the GPU's VRAM:
 
-OpenManusBot is the strand for tool-using councils. GrokBot remains the desktop coordinator ([Section 3](#3-grokbot)). The split between a stronger chief of staff and a local secrets model is the same privacy split examined in [Section 4](#4-local-llm).
+| VRAM | Model class | Command |
+|---|---|---|
+| 8 GB | 7–8B | `ollama pull qwen2.5-coder:7b` |
+| 12–16 GB | 14B | `ollama pull qwen2.5-coder:14b` |
+| 24 GB | 32B | `ollama pull qwen3:32b` |
 
-## 3. GrokBot
-
-GrokBot is the desktop, coordinator-style assistant in this education-technology stack. Earlier notes in this repository introduce OpenManusBot as an alternative under test. This section records the role GrokBot holds in the project and leaves a place for later results.
-
-### Methods
-
-Work assigned to GrokBot is coordination rather than a single closed workflow. In practice that has meant:
-
-- Orchestrating a multi-step school-technology task and deciding which part stays with GrokBot.
-- Repository and site work: reading the project, editing notes and site material, and keeping the written record aligned with what was tried.
-- Multi-agent teaming: handing a bounded piece of work to another agent, including a cloud coding session or the OpenManusBot council in [Section 2](#2-openmanusbot), then taking the result back into the project.
-- Documentation of the other strands (the EDB email flow, the local-model log, and the Z.ai design study).
-
-No separate tool prompt, timeout file, or connector list is stored for GrokBot in this repository. Those details, where they exist, belong to the OpenManusBot trial.
-
-### Observations
-
-The strength observed so far is the coordinator role itself: GrokBot is where orchestration, repository and site edits, documentation, and handoffs meet. It is used beside OpenManusBot, which carries the Composio tool loop and the council trials. Side-by-side scores against OpenManusBot, Kimi K3, or the local models are left for a later entry.
-
-### Results
-
-A results log is reserved here for later entries. A useful entry records the task, whether GrokBot did the work directly or handed it on, which agent received the handoff, and whether the handoff finished. Completion counts and timings are omitted until those entries exist.
-
-### Discussion
-
-GrokBot fits the work that spans several systems in these notes: keeping the written record, editing the repository, and passing a well-bounded task to OpenManusBot or a cloud coding session. Until the results log has entries, this section stays a methods note.
-
-## 4. Local LLM
-
-This section records an on-prem privacy trial: Ollama and Qwen on a school workstation, so sensitive work and student-related material can stay on hardware the school controls.
-
-### Methods
-
-Planned tiers on the machine below:
-
-- **8–9B local** for sensitive work.
-- **Qwen3-30B-A3B** (mixture-of-experts) on a local school server.
-- **Cloud models** for everything else.
-
-The same split appears in the OpenManusBot trial: 8B and 14B models could not drive connector MCPs, so a stronger chief-of-staff model handles tools and the local model handles private material.
-
-**Hardware:** workstation, 2× RTX 3080 10 GB (20 GB total VRAM, no NVLink → PCIe split), 32 GB system RAM.
-
-The interventions below were the procedure under test, cheapest first. Speeds are observations or targets for this machine only.
-
-**1. Diagnose before changing anything**
-
+3. Expose it to the network (PowerShell, then quit Ollama from the tray and relaunch):
+```powershell
+setx OLLAMA_HOST 0.0.0.0
+setx OLLAMA_CONTEXT_LENGTH 32768
+netsh advfirewall firewall add rule name="Ollama" dir=in action=allow protocol=TCP localport=11434
+powercfg /change standby-timeout-ac 0
+```
+`OLLAMA_CONTEXT_LENGTH` matters because Ollama defaults to a 4096-token context and will silently truncate long agent sessions. `powercfg` stops the PC sleeping mid-job.
+4. Note the PC's LAN IP (`ipconfig`) and set a DHCP reservation in the router so it never changes. Verify from another machine:
 ```bash
-ollama ps          # PROCESSOR column: "100% GPU" is good; "x%/y% CPU/GPU" = spill
-nvidia-smi         # both 3080s visible? how much VRAM used?
+curl http://<pc-ip>:11434/v1/models
 ```
+The model `id` in that response (e.g. `qwen2.5-coder:14b`) is what the clients below must use verbatim.
 
-**2. Switch to the MoE model** — this alone is usually a 4–6× jump
-
-```bash
-ollama pull qwen3:30b-a3b
-ollama run qwen3:30b-a3b
+### 2. opencode provider
+Add to `opencode.json` (project root, or `~/.config/opencode/opencode.json` globally):
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "windows-pc": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Windows PC (Ollama)",
+      "options": {
+        "baseURL": "http://<pc-ip>:11434/v1",
+        "apiKey": "local"
+      },
+      "models": {
+        "qwen2.5-coder:14b": {
+          "name": "Qwen2.5 Coder 14B"
+        }
+      }
+    }
+  }
+}
 ```
+Then run `/models` in opencode and select it. The `apiKey` is a placeholder — Ollama ignores it, but opencode requires one.
 
-**3. Force full GPU offload / both GPUs**
+### 3. OpenManusBot
+Point it at the same endpoint: `base_url` = `http://<pc-ip>:11434/v1`, any non-empty API key, and the model name must match the Ollama tag.
 
-```bash
-CUDA_VISIBLE_DEVICES=0,1 ollama serve
-```
+### 4. Using it from home (Tailscale)
+1. Install Tailscale on the Windows PC and every client device (Mac, phone), signing in with the same account (free for up to 100 devices).
+2. Replace `<pc-ip>` with the PC's Tailscale IP (`100.x.y.z`, shown by `tailscale ip -4`). This one address works on the home LAN, school network, and cellular — set the baseURL once and never touch it again. On the same LAN, Tailscale connects directly at full speed.
+3. Optional: enable MagicDNS in the Tailscale admin console to use a hostname like `http://my-pc:11434/v1` instead of an IP.
 
-and in the Modelfile / runtime:
-
-```
-PARAMETER num_gpu 99
-```
-
-Note: `num_gpu` counts *layers*. On an MoE the expert tensors are the bulk of the mass, so "99 layers on GPU" does not guarantee the experts are. Trust `ollama ps` over the Modelfile.
-
-**4. Shrink and quantize the KV cache** (the other half of "does it fit")
-
-```bash
-OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0 OLLAMA_SCHED_SPREAD=1 ollama serve
-```
-
-- `KV_CACHE_TYPE=q8_0` halves KV VRAM — the biggest "fits vs doesn't" lever at longer context.
-- `SCHED_SPREAD=1` — **undocumented / experimental**, not in Ollama's official docs. If used, verify the effect with `ollama ps`; Ollama's FAQ states it already auto-spreads a model across GPUs when it will not fit on one, so this is a last-resort lever, not a required setting.
-- `FLASH_ATTENTION=1` pairs with q8_0 KV (needs both).
-
-**5. Reduce context**
-
-```bash
->>> /set parameter num_ctx 8192   # 32k context is a large VRAM delta
-```
-
-**6. Disable Qwen3 "thinking" when not needed.** `qwen3:30b-a3b` emits reasoning tokens before answering, so it *feels* 2–5× slower even at full GPU. Use `/no_think` in the prompt.
-
-**7. Verify with a number, not a vibe**
-
-```bash
-ollama run qwen3:30b-a3b --verbose   # prints eval rate = tok/s
-```
-
-### Results
-
-Generation on the initial load ran at ~10 tokens/sec, too slow to be usable.
-
-10 tok/s is a **diagnostic, not a tuning problem**: it means a significant part of the model is running on **CPU**, not GPU. Two likely causes:
-
-1. **Wrong model loaded.** The dense 32B model at 4-bit is ~19–20 GB *before* KV cache. On a 20 GB box it cannot fully fit, so layers spill to the 32 GB system RAM and decode collapses to single digits.
-2. **Ollama not spreading across both GPUs.** Ollama's official FAQ states it already auto-spreads a model across GPUs when it will not fit on one, so "default piles everything on GPU 0" is *not* documented behavior. Treat this as a possible cause to verify with `ollama ps` / `nvidia-smi`, not an assumption.
-
-There is **no "27B Qwen"** — the relevant models are **Qwen3-30B-A3B** (MoE, ~3B active parameters) and **Qwen2.5/3-32B** (dense). The MoE/dense choice is the whole answer.
-
-For the MoE weights themselves: 4-bit weights ~17–18 GB, only ~3B active at a time → 40–60 tok/s single-stream on this box. That figure is the expected single-stream rate once the model is fully on GPU. The check used in this log is `ollama ps` reading `100% GPU`, with `ollama run qwen3:30b-a3b --verbose` printing the eval rate. Target: eval rate lands ~40–60 tok/s.
-
-#### Engine choice — Ollama vs llama.cpp vs vLLM
-
-The engine was never the bottleneck; **VRAM was**.
-
-| Engine | Best for | Notes on this hardware |
-| --- | --- | --- |
-| **Ollama** (llama.cpp) | single / low-concurrency pilot | Right choice here; lowest ops overhead |
-| **llama.cpp server** | same, plus tuning knobs | `-ngl 99 -fa -ctk q8_0 -ctv q8_0 -c 8192 --split-mode layer` |
-| **vLLM** | high concurrency on a real serving box | Needs AWQ/GPTQ (not GGUF); paged-KV/CUDA-graph overhead; won't fit 30B MoE on 20 GB |
-
-- On a 20 GB box, vLLM's own overhead is *worse* than Ollama's. The wall is VRAM, not software: 20 GB cannot hold 17–18 GB of MoE weights *plus* batching headroom.
-- vLLM would **not** fix 10 tok/s — that is CPU offload, and vLLM would likely OOM or refuse.
-- The GGUF MoE path is **not supported / not recommended** in vLLM (GGUF support is limited/experimental and MoE+GGUF is effectively unsupported); use an **AWQ/GPTQ** (or FP8) artifact for vLLM instead.
-
-#### Version notes (verified)
-
-- **vLLM ≥ v0.8.5** is the first release with Qwen3 / Qwen3-MoE support (release notes: "Day 0 support for Qwen3 and Qwen3MoE").
-- **`OLLAMA_FLASH_ATTENTION`** and **`OLLAMA_KV_CACHE_TYPE`** (`f16`/`q8_0`/`q4_0`) are documented in Ollama's official FAQ; quantized KV **requires** Flash Attention.
-- **`OLLAMA_SCHED_SPREAD`** is **undocumented/experimental** — not in official docs (see Fix 4).
-- Confirm your own builds before quoting numbers: `ollama -v`, and check the vLLM release notes for MoE support.
-
-### Discussion
-
-This workstation is a **pilot tier only**. Realistic concurrency: 1–2 users fine, 3–5 usable with rising latency, class-size or admin-desk concurrency collapses. 100+ staff needs a **dedicated serving box (48–96 GB+ VRAM) running vLLM**.
-
-**Move to vLLM when:** sustained **≥8 concurrent users** past the P95 latency target, **or** long-context/RAG at **≥4 concurrent** — *and* you have **≥48 GB VRAM**. Until then, stay on Ollama.
-
-Three-pillar check:
-
-- **Privacy:** local 8–9B for sensitive and student work is the strongest play; keep student data off mainland processing nodes and keep the school's PDPO duties (parent-consent notices on cross-border transfer) in view.
-- **Sustainability:** the 30B tier on a single workstation is the weakest link — no SLA, no redundancy, PCIe-split. Fine as a pilot, not as school infrastructure.
-- **Functions:** MoE gets you a usable single-user tier; it does not make this box a shared school service.
-
-## 5. Z.ai (CAD / mechanical design case study)
-
-Z.ai is the system used here for printable mechanical design. The case is a buoyancy profiling float for school technology work, including competition robotics: parts a workshop can slice, print, and assemble.
-
-### Methods
-
-Z.ai generated and assisted the solid model. The float is split into three pieces that share one print plate: a cap, a nose, and a body. The cap is oriented print-plate-down. The nose is labeled on the model as 77 tall, made up of a 12 spigot, a 4 flange, and a 61 dome, in the units of the source file. The body is shown transparent so the internal rails and strap tabs stay visible before printing. The plate layout is the file `print_plate.stl`.
-
-### Results
-
-The design output is the four-panel figure below: a Z.ai render of the model and the print-plate layout.
-
-![Z.ai design of a buoyancy profiling float: cap printed plate-down, nose labeled 77 tall, transparent body with internal rails and strap tabs, and the print-plate STL layout](docs/ai-capabilities/cad-float-print-plate.png)
-
-*Figure. Z.ai CAD study of a buoyancy profiling float, laid out for one print plate. Top left: cap (print plate-down). Top right: nose, labeled 77 tall (12 spigot + 4 flange + 61 dome). Bottom left: transparent body with internal rails and strap tabs. Bottom right: the three parts in the `print_plate.stl` layout.*
-
-### Discussion
-
-The figure is enough to check print orientation, the nose stack-up, and whether the internal rails and strap tabs are present in the body. A later entry can record the sliced plate, the printer and material, and whether the three parts seated together. Print and fit-up results are reserved for that entry.
+### Notes
+- Ollama has **no authentication** — never port-forward `11434` to the internet. LAN + Tailscale only.
+- The first request after idle is slow while the model loads into VRAM. Set `OLLAMA_KEEP_ALIVE=-1` to keep it permanently loaded at the cost of reserved VRAM.
+- After a Windows update reboot the PC must be logged in before Ollama starts — enable automatic sign-in if it runs unattended.
+- As noted in the OpenManusBot section above, 8B/14B local models handle tool-calling and MCP connectors poorly — use them for auxiliary roles and keep a strong cloud model as chief of staff.
