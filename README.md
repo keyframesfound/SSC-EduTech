@@ -161,7 +161,7 @@ And the fleet does not just share models — the models discuss with each other.
 
 ## 3. GrokBot: building the ASR project
 
-GrokBot's coordinator role was given a full software project to build: [ASR](https://github.com/keyframesfound/asr), a local speech-recognition tool in my GitHub, related to the iFlytek research behind `iflytek_realtime_asr.py` in this repository.
+GrokBot's coordinator role was given a full software project to build: [ASR](https://github.com/keyframesfound/asr), a local speech-recognition tool in my GitHub, related to the iFlytek research recorded in these notes.
 
 ### Why local recognition
 
@@ -294,7 +294,7 @@ Build me a profiling float design fit for the Mate ROV 2026 competition specs, I
 
 <img width="640" height="541" alt="Blender viewport during the build, showing the float model with the scene lights and cameras" src="docs/mate_float_blender_viewport.png" />
 
-The first figure is the finished render; the second is the Blender viewport during the build, with the scene's lights and cameras placed around the model.
+The first figure is the finished render; the second is the Blender viewport during the build, with the scene's lights and cameras placed around the model. The float was built by following the packaged skill in [`skills/blender-3d-modeling/`](skills/blender-3d-modeling/SKILL.md), which is included in this repository so the run can be reproduced: preflight health checks before writing any Blender Python, the competition constraints collected up front as numeric assertions, one idempotent `BP_`-prefixed build script re-run whole each cycle, a bounding-box check of the finished mesh against those constraints, corrected studio-lighting baselines, and a stdio MCP fallback client for runs where the native MCP tools are absent. The float's own build script and design brief are in [`skills/blender-3d-modeling/examples/`](skills/blender-3d-modeling/examples/).
 
 ### Which route when
 
