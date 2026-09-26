@@ -4,7 +4,7 @@ Improving technology for education.
 
 ## Abstract
 
-SSC-EduTech is an education-technology exploration of several AI systems, with each system tried on a different kind of school work. These notes record what each one was used for and what was actually written down. Amazon Quick (AWS) automates an Education Bureau (EDB) teacher-training path from the public calendar to a weekly email and then to the teacher's calendar, including a conflict message and an override reply. OpenManusBot is under test for multi-agent task automation and councils, with Composio connectors, a 20-minute turn limit, and a short rule against repeated tool calls. GrokBot is the desktop coordinator for orchestration, repository and site work, documentation, and handoffs to other agents; a scored results log for that role is still open. A local Ollama and Qwen deployment was examined for on-prem privacy on one dual-GPU workstation. Z.ai assisted a printable mechanical design, a buoyancy profiling float, reproduced here as a four-panel print-plate figure.
+SSC-EduTech is an education-technology exploration of several AI systems, with each system tried on a different kind of school work. These notes record what each one was used for and what was actually written down. Amazon Quick (AWS) automates an Education Bureau (EDB) teacher-training path from the public calendar to a weekly email and then to the teacher's calendar, including a conflict message and an override reply. OpenManusBot is under test for multi-agent task automation and councils, with Composio connectors, a 20-minute turn limit, and a short rule against repeated tool calls. GrokBot is the desktop coordinator for orchestration, repository and site work, documentation, and handoffs to other agents, and was given a full software project to build: ASR, a local speech-recognition tool in my GitHub, where it worked through reviewable pull requests and deployed through computer control. A local Ollama and Qwen deployment was examined for on-prem privacy on one dual-GPU workstation. Z.ai assisted a printable mechanical design, a buoyancy profiling float, reproduced here as a four-panel print-plate figure. A later entry works through 3D modelling with ZCode and Kimi: generating STL files directly, drawing through Onshape's FeatureScript MCP, and the newer Kimi MCP route into Fusion 360 and Blender.
 
 ## 1. Amazon Quick (AWS) Research
 
@@ -43,13 +43,13 @@ The procedure keeps the teacher inside email: a weekly summary, a reply, and a c
 
 ## 2. OpenManusBot
 
-OpenManusBot is an alternative to GrokBot ([Section 3](#3-grokbot)). In these notes it is the system under test for automated tasks and AI councils.
+OpenManusBot is an alternative to GrokBot ([Section 3](#3-grokbot-building-the-asr-project)). In these notes it is the system under test for automated tasks and AI councils.
 
 ### Methods
 
 Testing so far includes Kimi K3 and OpenCode, which provides a free model. OpenAI-compatible models were also tried. External apps (Gmail, Calendar, Slack, Notion, and others) are reached only through Composio tool calls. The prompt given to the agent is reproduced below in full.
 
-Local 8B and 14B models cannot drive connector MCPs, so they stay off the chief-of-staff role. The working arrangement is a stronger chief of staff — Kimi K3, Grok, or an OpenCode free model — with a local model such as Qwen 120B as the secrets model for material that should stay private. Hardware limits for that local model are in [Section 4](#4-local-llm).
+Local 8B and 14B models cannot drive connector MCPs, so they stay off the chief-of-staff role. The working arrangement is a stronger chief of staff — Kimi K3, Grok, or an OpenCode free model — with a local model such as Qwen 120B as the secrets model for material that should stay private. Hardware limits for that local model are in [Section 4](#4-local-ai-server-windows-pc).
 
 ```
 Prompt for Local Agent to Access Tools
@@ -151,7 +151,26 @@ do not issue the identical call again. Change approach or ask the user.
 
 As for local models, 8B and 14B are out of the picture as 8B and 14B both are unable to use connector MCPs. As per suggestion, I advise the use of smart models like Kimik3 or Grok or Open Code Free Models as the main chief of staff while using local models like Quen 120B to be the secrets model.
 
-## Local AI Server (Windows PC)
+## 3. GrokBot: building the ASR project
+
+GrokBot's coordinator role was given a full software project to build: [ASR](https://github.com/keyframesfound/asr), a local speech-recognition tool in my GitHub, related to the iFlytek research behind `iflytek_realtime_asr.py` in this repository.
+
+### Why local recognition
+
+ASR is aimed at generating meeting minutes. The iFlytek API portal is a bit broken at the moment, so the design follows the HEX audio-diction app instead: the dictation models run locally and produce a transcript. The transcript — not the audio — is then handed to Gemini for the summary, because Gemini reading text summarises faster and misses fewer details than it does working from a regular MP3.
+
+The project itself is a keyboard-first terminal UI for live microphone transcription, built with a Cantonese–English workflow in mind. Parakeet TDT 0.6B (MLX, Apple Silicon) is the default English engine, Whisper Large V3 Turbo and SenseVoice Small cover the rest (SenseVoice for Cantonese), and iFlytek streaming stays available as an optional cloud engine with its credentials in a gitignored `.env`. On stop, the whole recorded session is re-decoded in one batch pass for accuracy, then exports as MP3 plus a `.txt` transcript.
+
+### Working with GrokBot
+
+- GrokBot constantly creates pull requests as it codes. Every change arrives as a reviewable PR, so its coding can be manually verified before anything is merged.
+- Through controlling the computer, it can deploy the project quickly once the code is ready.
+
+### Observations
+
+GrokBot uses tokens quickly and is less efficient than regular Codex or ZCode. Its intelligence is nonetheless smarter and stronger in software development. That makes it the more expensive option for an experienced software engineer, but useful when the run is completely autonomous and its stronger reasoning stands in for the engineer.
+
+## 4. Local AI Server (Windows PC)
 A Windows PC runs models through [Ollama](https://ollama.com) and exposes an OpenAI-compatible API on port `11434`. opencode and OpenManusBot both point at this one endpoint, and [Tailscale](https://tailscale.com) makes the same address work from home or any other network.
 
 ### 1. Server setup (Windows)
@@ -215,3 +234,51 @@ Point it at the same endpoint: `base_url` = `http://<pc-ip>:11434/v1`, any non-e
 - The first request after idle is slow while the model loads into VRAM. Set `OLLAMA_KEEP_ALIVE=-1` to keep it permanently loaded at the cost of reserved VRAM.
 - After a Windows update reboot the PC must be logged in before Ollama starts — enable automatic sign-in if it runs unattended.
 - As noted in the OpenManusBot section above, 8B/14B local models handle tool-calling and MCP connectors poorly — use them for auxiliary roles and keep a strong cloud model as chief of staff.
+- A Mixture-of-Experts (MoE) model trades intelligence for speed: Qwen3-30B-A3B (`ollama pull qwen3:30b-a3b` — 30B total parameters, only ~3B active per token) raises local generation from about 10 to 56 tokens/s. The 3B active slice is less smart, though, so the gmail problem stands: like the 8B/14B models it still cannot drive the connector MCPs that OpenManusBot needs ([Section 2](#2-openmanusbot)).
+
+## 5. 3D Modelling with ZCode and Kimi
+
+This section is a tutorial for getting a 3D model out of an AI agent, written after trying three routes. The short version: an agent can hand you a printable STL file directly, but that file is slow to generate, expensive in tokens, and cannot be modified afterwards. The MCP routes — Onshape, and now Fusion 360 and Blender through Kimi — produce models that stay editable, and are the better workshop for anything you will iterate on.
+
+### Route 1: ask for the STL file directly
+
+The most direct route needs no connectors at all. ZCode, Kimi, and Claude can each produce a 3D model as an STL file on request: the agent writes a Python script that builds the mesh triangle by triangle, runs it, and saves the STL, ready to slice and print.
+
+1. Describe the part in plain language — overall dimensions, wall thickness, holes.
+2. Ask the agent for an STL file. It writes and runs a mesh-generation script and saves the file to disk.
+3. Open the STL in a slicer and print.
+
+Three findings from practice:
+
+- **Slow.** Generating the STL takes a long time, because the whole surface is written out as explicit triangles.
+- **Token-heavy.** Every one of those triangles passes through the model as text, so one part consumes a large number of tokens.
+- **Not modifiable.** The result is a static mesh with no feature history. "Make the wall 2 mm thicker" means regenerating the entire file from scratch, not editing a parameter.
+
+Fine for a one-shot decorative shape; poor for anything that needs a second revision.
+
+### Route 2: Onshape MCP (FeatureScript)
+
+The Onshape MCP server only supports FeatureScript, Onshape's parametric scripting language, so models are drawn as code: each sketch, extrude, and fillet is a named feature that rebuilds when a number changes.
+
+- It is possible to draw real 3D models with it, and unlike Route 1 they stay editable — change a dimension and the part rebuilds.
+- But the models are constrained to what FeatureScript covers. Anything outside its sketch-and-feature world is awkward to express.
+
+### Route 3: Fusion 360 and Blender over MCP
+
+The newest route uses MCP from Kimi, which lets the agent draw with full desktop applications instead of generating files blind:
+
+- **Fusion 360** for parametric CAD — dimensioned sketches and features that stay editable, like Onshape but with a much larger toolkit.
+- **Blender** for mesh modelling — organic and artistic shapes that FeatureScript cannot express. The connection requires a Blender version above 5.0; older versions do not work, so update Blender first.
+
+Setup is the usual MCP wiring: add the Kimi MCP connector for the application, launch the desktop app before the agent connects, then model in plain language ("sketch a 60 mm circle, extrude 4 mm, cut a 3 mm hole pattern").
+
+### Which route when
+
+| Route | Editable | Cost | Best for |
+|---|---|---|---|
+| Direct STL (ZCode, Kimi, Claude) | No — regenerate to change anything | Slow, token-heavy | One-shot decorative shapes |
+| Onshape MCP (FeatureScript) | Yes, parametric | Fast, but constrained | Mechanical parts within FeatureScript's feature set |
+| Fusion 360 via Kimi MCP | Yes, parametric | Not yet timed | Full CAD parts |
+| Blender via Kimi MCP (v5.0+) | Yes, mesh | Not yet timed | Organic and artistic models |
+
+Timing and token counts for the two MCP routes are left for a later entry, as with the email flows in [Section 1](#1-amazon-quick-aws-research).
