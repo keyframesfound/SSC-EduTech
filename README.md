@@ -151,6 +151,14 @@ do not issue the identical call again. Change approach or ask the user.
 
 As for local models, 8B and 14B are out of the picture as 8B and 14B both are unable to use connector MCPs. As per suggestion, I advise the use of smart models like Kimik3 or Grok or Open Code Free Models as the main chief of staff while using local models like Quen 120B to be the secrets model.
 
+Swapping in stronger models — or running a whole fleet of them — is easy, because access is just a matter of giving out API keys. The OpenCode connector picks a model per thread, independently of the other threads and groups: DeepSeek V4 Flash, Zen's free models, a reasoning variant from Low to Max, or one of the local models, all from the same picker.
+
+<img width="400" height="536" alt="OpenCode model picker inside OpenManusBot, choosing a per-thread model from cloud providers or local models" src="docs/opencode_model_picker.png" />
+
+And the fleet does not just share models — the models discuss with each other. The Board of Directors thread below has the President and the CAO debating whether the whole fleet should move onto the OpenCode Go subscription: the GLM, Kimi, Qwen, DeepSeek, and MiniMax roster weighed against the rolling usage caps, with the closing play that routine fleet work runs on cheap flash models while premium models are saved for hard passes.
+
+<img width="420" height="594" alt="Board of Directors council in OpenManusBot, with the President and CAO bots debating the OpenCode Go plan for the fleet" src="docs/board_of_directors_discussion.png" />
+
 ## 3. GrokBot: building the ASR project
 
 GrokBot's coordinator role was given a full software project to build: [ASR](https://github.com/keyframesfound/asr), a local speech-recognition tool in my GitHub, related to the iFlytek research behind `iflytek_realtime_asr.py` in this repository.
@@ -248,6 +256,10 @@ The most direct route needs no connectors at all. ZCode, Kimi, and Claude can ea
 2. Ask the agent for an STL file. It writes and runs a mesh-generation script and saves the file to disk.
 3. Open the STL in a slicer and print.
 
+The route is conversational rather than one-shot. In the exchange below, Claude grapples with ambiguous cylinder dimensions and seeks clarification before building anything: the outer cylinder as specified could not wrap around the inner one, so it asks which number is wrong, what the "2 sides Cs" mean, and confirms a best-guess interpretation before writing any geometry.
+
+<img width="420" height="442" alt="Claude clarifying ambiguous cylinder dimensions before generating an STL file" src="docs/claude_stl_clarification.png" />
+
 Three findings from practice:
 
 - **Slow.** Generating the STL takes a long time, because the whole surface is written out as explicit triangles.
@@ -271,6 +283,18 @@ The newest route uses MCP from Kimi, which lets the agent draw with full desktop
 - **Blender** for mesh modelling — organic and artistic shapes that FeatureScript cannot express. The connection requires a Blender version above 5.0; older versions do not work, so update Blender first.
 
 Setup is the usual MCP wiring: add the Kimi MCP connector for the application, launch the desktop app before the agent connects, then model in plain language ("sketch a 60 mm circle, extrude 4 mm, cut a 3 mm hole pattern").
+
+As a worked example, the prompt below drove the Blender route: a profiling float to the MATE ROV 2026 competition specs, the same family of design as the Z.ai buoyancy float in the Abstract. The prompt is reproduced as submitted.
+
+```
+Build me a profiling float design fit for the Mate ROV 2026 competition specs, I need this design to be compact but also versatile in competing all the tasks, make ti look like those real ocean research floats
+```
+
+<img width="400" height="500" alt="Rendered profiling float for the MATE ROV 2026 competition, built in Blender over MCP" src="docs/mate_float_preview_v3.png" />
+
+<img width="640" height="541" alt="Blender viewport during the build, showing the float model with the scene lights and cameras" src="docs/mate_float_blender_viewport.png" />
+
+The first figure is the finished render; the second is the Blender viewport during the build, with the scene's lights and cameras placed around the model.
 
 ### Which route when
 
